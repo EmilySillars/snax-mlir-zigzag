@@ -46,7 +46,7 @@ void _mlir_ciface_simple_matmul(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
 
 void _mlir_ciface_snax_qgemm(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, int32_t zpa,
                              int32_t zpb, TwoDMemrefI32_t *c) {
-  printf("hola TANGERINE\n");                            
+                          
   int8_t *a_ptr = a->aligned_data;
   int8_t *b_ptr = b->aligned_data;
   int32_t *c_ptr = c->aligned_data;
@@ -62,30 +62,31 @@ void _mlir_ciface_snax_qgemm(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, int32_t zpa,
 
   wait_batch_gemm();
 
-  printf("Finished executing snax_qgemm YODELAYHEEHOOOOOOOO~~~~~~~~~~!\n");
 }
 
 int main() {
 
-  printf("hola PAMPLEMOUSSE\n");
+  printf("PAMPLEMOUSSE VOLCANO: Setting up the data.\n");
 
   // Create memref objects for data stored in L3
   TwoDMemrefI8_t memrefA;
-  memrefA.data = &A;
+  memrefA.data = (int8_t *)  &A;
   memrefA.aligned_data = memrefA.data;
   memrefA.offset = 0;
 
   TwoDMemrefI8_t memrefB;
-  memrefB.data = &B;
+  memrefB.data = (int8_t *)  &B;
   memrefB.aligned_data = memrefB.data;
   memrefB.offset = 0;
 
   TwoDMemrefI32_t memrefC;
-  memrefC.data = &C;
+  memrefC.data = (int32_t *) &C;
   memrefC.aligned_data = memrefC.data;
   memrefC.offset = 0;
 
   (void)snrt_mcycle();
+
+  printf("PAMPLEMOUSSE VOLCANO: calling _mlir_ciface_simple_matmu with\n &memrefA=%p, &memrefB=%p, &memrefC=%p \n", &memrefA, &memrefB, &memrefC);
 
   _mlir_ciface_simple_matmul(&memrefA, &memrefB, &memrefC);
 
