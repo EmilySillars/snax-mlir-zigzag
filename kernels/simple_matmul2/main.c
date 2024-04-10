@@ -147,6 +147,13 @@ void cCodeEquivalent(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y, TwoDMemrefI32_t *z) {
 }
 
 /*
+PLAN: 
+1) rewrite the single loop C code version as a two-loop code version?
+2) Create equivalent python workload
+3) transform based on this ouput
+*/
+
+/*
 #define N_size 16
 #define K_size 16
 #define M_size 16
