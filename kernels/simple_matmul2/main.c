@@ -89,19 +89,15 @@ int main() {
   memrefC.aligned_data = memrefC.data;
   memrefC.offset = 0;
 
-  printf("before linalg call, A's first elt is %d\n", memrefA.aligned_data[0]);
-
   (void)snrt_mcycle();
-
-  printf("PAMPLEMOUSSE VOLCANO: calling _mlir_ciface_simple_matmu with\n "
-         "&memrefA=%p, &memrefB=%p, &memrefC=%p \n",
-         &memrefA, &memrefB, &memrefC);
 
   _mlir_ciface_simple_matmul(&memrefA, &memrefB, &memrefC);
 
   snrt_cluster_hw_barrier();
 
   (void)snrt_mcycle();
+
+  printf("PAMPLEMOUSSE VOLCANO: Performed MLIR kernel.\n");
 
   // Correctness check -
   // from this point on only core 0 is required to be alive.
@@ -117,34 +113,54 @@ int main() {
   }
 
   if (nerr != 0) {
-    printf("C does not match the golden value!\n");
+    printf("Output does not match the golden value!\n");
     return nerr;
   }
-  printf("after linalg call, A's first elt is %d\n", memrefA.aligned_data[0]);
+
   // second correctness check - is the c code really equivalent??
-  TwoDMemrefI32_t z;
-  z.data = (int32_t *)&C;
-  z.aligned_data = z.data;
-  z.offset = 0;
-  cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
- // cCodeEquivalentThreeLoops(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
+  // TwoDMemrefI32_t z;
+  // z.data = (int32_t *)&C;
+  // z.aligned_data = z.data;
+  // z.offset = 0;
+
+  // cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
+
+  // nerr = 0;
+  // for (int i = 0; i < M_size * N_size; i++) {
+  //   int32_t error = z.aligned_data[i] - C_golden[i];
+  //   if (error != 0)
+  //     nerr += 1;
+  // }
+  // if (nerr != 0) {
+  //   printf("Z does not match the golden value!\n");
+  // }
+
+  // third correctness check - is THIS c code really equivalent???
+  TwoDMemrefI32_t w;
+  w.data = (int32_t *)&C;
+  w.aligned_data = w.data;
+  w.offset = 0;
+
+  cCodeEquivalentThreeLoops(&memrefA, &memrefB, &w); // PAMPLEMOUSSE
+
   nerr = 0;
   for (int i = 0; i < M_size * N_size; i++) {
-    int32_t error = z.aligned_data[i] - C_golden[i];
+    int32_t error = w.aligned_data[i] - C_golden[i];
     if (error != 0)
       nerr += 1;
   }
   if (nerr != 0) {
-    printf("Z does not match the golden value!\n");
+    printf("w does not match the golden value!\n");
   }
-  print2DMemRefI8_t(&memrefA, M_size);
-  print2DMemRefI8_t(&memrefB, M_size);
-  print2DMemRefI32_t(&memrefC, M_size); // PAMPLEMOUSSE
-  print2DMemRefI32_t(&z, M_size);       // PAMPLEMOUSSE
+  // print2DMemRefI8_t(&memrefA, M_size);
+  // print2DMemRefI8_t(&memrefB, M_size);
+  // print2DMemRefI32_t(&memrefC, M_size); // PAMPLEMOUSSE
+  print2DMemRefI32_t(&w, M_size); // PAMPLEMOUSSE
   printf("SNAX\n");
   return nerr;
 }
 
+// helper funcs below
 void print2DMemRefI8_t(TwoDMemrefI8_t *x, int32_t width) {
   printf("[\n");
   // we ASSUME a square 2D array
@@ -182,9 +198,12 @@ void print2DMemRefI32_t(TwoDMemrefI32_t *x, int32_t width) {
 void cCodeEquivalent(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y, TwoDMemrefI32_t *z) {
   printf("M_size is %d and N_size is %d\n", M_size, N_size);
   for (int i = 0; i < M_size * N_size; i++) {
-    z->aligned_data[i] = (int32_t) x->aligned_data[i] * (int32_t) y->aligned_data[i];
-    //printf(" %d * %d = %d  = %d\n",  x->aligned_data[i], y->aligned_data[i],x->aligned_data[i] * y->aligned_data[i], z->aligned_data[i]);
-    // z->aligned_data[i] = C_golden[i];
+    z->aligned_data[i] =
+        (int32_t)x->aligned_data[i] * (int32_t)y->aligned_data[i];
+    // printf(" %d * %d = %d  = %d\n",  x->aligned_data[i],
+    // y->aligned_data[i],x->aligned_data[i] * y->aligned_data[i],
+    // z->aligned_data[i]);
+    //  z->aligned_data[i] = C_golden[i];
   }
 }
 
@@ -198,11 +217,12 @@ void cCodeEquivalentThreeLoops(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y,
   for (int d0 = 0; d0 < M_size; d0++) {
     for (int d1 = 0; d1 < M_size; d1++) {
       for (int d2 = 0; d2 < M_size; d2++) {
-        //arg7[d0][d1] += arg3[d0][d2] * arg4[d2][d1]; // and this is a MAC!
-        z_index = (d0*M_size) + d1;
-        x_index = (d0*M_size) + d2;
-        y_index = (d2*M_size) + d1;
-        z->aligned_data[z_index] += x->aligned_data[x_index] * y->aligned_data[y_index];
+        // arg7[d0][d1] += arg3[d0][d2] * arg4[d2][d1]; // and this is a MAC!
+        z_index = (d0 * M_size) + d1;
+        x_index = (d0 * M_size) + d2;
+        y_index = (d2 * M_size) + d1;
+        z->aligned_data[z_index] +=
+            x->aligned_data[x_index] * y->aligned_data[y_index];
       }
     }
   }
