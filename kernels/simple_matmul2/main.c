@@ -63,7 +63,11 @@ void _mlir_ciface_snax_qgemm(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, int32_t zpa,
   wait_batch_gemm();
 }
 
+void cCodeEquivalentThreeLoops(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y,
+                               TwoDMemrefI32_t *z);
 void cCodeEquivalent(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y, TwoDMemrefI32_t *z);
+void print2DMemRefI8_t(TwoDMemrefI8_t *x, int32_t width);
+void print2DMemRefI32_t(TwoDMemrefI32_t *x, int32_t width);
 
 int main() {
 
@@ -85,7 +89,7 @@ int main() {
   memrefC.aligned_data = memrefC.data;
   memrefC.offset = 0;
 
-  printf("before linalg call, A's first elt is %d\n",memrefA.aligned_data[0]);
+  printf("before linalg call, A's first elt is %d\n", memrefA.aligned_data[0]);
 
   (void)snrt_mcycle();
 
@@ -116,13 +120,14 @@ int main() {
     printf("C does not match the golden value!\n");
     return nerr;
   }
-  printf("after linalg call, A's first elt is %d\n",memrefA.aligned_data[0]);
+  printf("after linalg call, A's first elt is %d\n", memrefA.aligned_data[0]);
   // second correctness check - is the c code really equivalent??
   TwoDMemrefI32_t z;
   z.data = (int32_t *)&C;
   z.aligned_data = z.data;
   z.offset = 0;
-  cCodeEquivalent(&memrefA, &memrefB, &z);
+  cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
+ // cCodeEquivalentThreeLoops(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
   nerr = 0;
   for (int i = 0; i < M_size * N_size; i++) {
     int32_t error = z.aligned_data[i] - C_golden[i];
@@ -132,22 +137,86 @@ int main() {
   if (nerr != 0) {
     printf("Z does not match the golden value!\n");
   }
+  print2DMemRefI8_t(&memrefA, M_size);
+  print2DMemRefI8_t(&memrefB, M_size);
+  print2DMemRefI32_t(&memrefC, M_size); // PAMPLEMOUSSE
+  print2DMemRefI32_t(&z, M_size);       // PAMPLEMOUSSE
+  printf("SNAX\n");
   return nerr;
 }
 
-// void printTwoDMemrefI8_t(TwoDMemrefI8_t *x);
-// void printTwoDMemrefI32_t(TwoDMemrefI8_t *y);
+void print2DMemRefI8_t(TwoDMemrefI8_t *x, int32_t width) {
+  printf("[\n");
+  // we ASSUME a square 2D array
+  int32_t col = 0;
+  for (int i = 0; i < width * width; i++) {
+    if (col == width) {
+      col = 0;
+      printf("\n %d ", x->aligned_data[i]);
+
+    } else {
+      printf(" %d ", x->aligned_data[i]);
+    }
+    col++;
+  }
+  printf("]\n");
+}
+
+void print2DMemRefI32_t(TwoDMemrefI32_t *x, int32_t width) {
+  printf("[\n");
+  // we ASSUME a square 2D array
+  int32_t col = 0;
+  for (int i = 0; i < width * width; i++) {
+    if (col == width) {
+      col = 0;
+      printf("\n %d ", x->aligned_data[i]);
+
+    } else {
+      printf(" %d ", x->aligned_data[i]);
+    }
+    col++;
+  }
+  printf("]\n");
+}
 
 void cCodeEquivalent(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y, TwoDMemrefI32_t *z) {
-  printf("M_size is %d and N_size is %d\n",M_size, N_size);
+  printf("M_size is %d and N_size is %d\n", M_size, N_size);
   for (int i = 0; i < M_size * N_size; i++) {
-    z->aligned_data[i] = x->aligned_data[i] * y->aligned_data[i];
-   // z->aligned_data[i] = C_golden[i];
+    z->aligned_data[i] = (int32_t) x->aligned_data[i] * (int32_t) y->aligned_data[i];
+    //printf(" %d * %d = %d  = %d\n",  x->aligned_data[i], y->aligned_data[i],x->aligned_data[i] * y->aligned_data[i], z->aligned_data[i]);
+    // z->aligned_data[i] = C_golden[i];
+  }
+}
+
+void cCodeEquivalentThreeLoops(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y,
+                               TwoDMemrefI32_t *z) {
+  // printf("M_size is %d and N_size is %d\n",M_size, N_size);
+  // for (int i = 0; i < M_size * N_size; i++) {
+  //   z->aligned_data[i] = x->aligned_data[i] * y->aligned_data[i];
+  // }
+  int z_index, x_index, y_index = 0;
+  for (int d0 = 0; d0 < M_size; d0++) {
+    for (int d1 = 0; d1 < M_size; d1++) {
+      for (int d2 = 0; d2 < M_size; d2++) {
+        //arg7[d0][d1] += arg3[d0][d2] * arg4[d2][d1]; // and this is a MAC!
+        z_index = (d0*M_size) + d1;
+        x_index = (d0*M_size) + d2;
+        y_index = (d2*M_size) + d1;
+        z->aligned_data[z_index] += x->aligned_data[x_index] * y->aligned_data[y_index];
+      }
+    }
   }
 }
 
 /*
-PLAN: 
+for d0; d0 < 16; d0++:
+for d1; d1 < 16; d1++;
+for d2; d2 < 16; d2++;
+  arg7[d0][d1] += arg3[d0][d2] * arg4[d2][d1]; // and this is a MAC!
+*/
+
+/*
+PLAN:
 1) rewrite the single loop C code version as a two-loop code version?
 2) Create equivalent python workload
 3) transform based on this ouput
