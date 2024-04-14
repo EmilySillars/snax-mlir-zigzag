@@ -118,22 +118,23 @@ int main() {
   }
 
   // second correctness check - is the c code really equivalent??
-  // TwoDMemrefI32_t z;
-  // z.data = (int32_t *)&C;
-  // z.aligned_data = z.data;
-  // z.offset = 0;
+  TwoDMemrefI32_t z;
+  z.data = (int32_t *)&C;
+  z.aligned_data = z.data;
+  z.offset = 0;
 
-  // cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
+  cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
 
-  // nerr = 0;
-  // for (int i = 0; i < M_size * N_size; i++) {
-  //   int32_t error = z.aligned_data[i] - C_golden[i];
-  //   if (error != 0)
-  //     nerr += 1;
-  // }
-  // if (nerr != 0) {
-  //   printf("Z does not match the golden value!\n");
-  // }
+  nerr = 0;
+  for (int i = 0; i < M_size * N_size; i++) {
+    int32_t error = z.aligned_data[i] - C_golden[i];
+    if (error != 0)
+      nerr += 1;
+  }
+  if (nerr != 0) {
+    printf("Z does not match the golden value!\n");
+    print2DMemRefI32_t(&z, M_size); // PAMPLEMOUSSE
+  }
 
   // third correctness check - is THIS c code really equivalent???
   TwoDMemrefI32_t w;
@@ -151,12 +152,8 @@ int main() {
   }
   if (nerr != 0) {
     printf("w does not match the golden value!\n");
+    print2DMemRefI32_t(&w, M_size); // PAMPLEMOUSSE
   }
-  // print2DMemRefI8_t(&memrefA, M_size);
-  // print2DMemRefI8_t(&memrefB, M_size);
-  // print2DMemRefI32_t(&memrefC, M_size); // PAMPLEMOUSSE
-  print2DMemRefI32_t(&w, M_size); // PAMPLEMOUSSE
-  printf("SNAX\n");
   return nerr;
 }
 
@@ -200,10 +197,6 @@ void cCodeEquivalent(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y, TwoDMemrefI32_t *z) {
   for (int i = 0; i < M_size * N_size; i++) {
     z->aligned_data[i] =
         (int32_t)x->aligned_data[i] * (int32_t)y->aligned_data[i];
-    // printf(" %d * %d = %d  = %d\n",  x->aligned_data[i],
-    // y->aligned_data[i],x->aligned_data[i] * y->aligned_data[i],
-    // z->aligned_data[i]);
-    //  z->aligned_data[i] = C_golden[i];
   }
 }
 
