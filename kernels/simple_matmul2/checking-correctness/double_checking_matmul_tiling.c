@@ -28,6 +28,8 @@ void transposeSquareMat(squareMat *t, squareMat *m);
 
 // interesting functions
 void mlir_qmat(squareMat *a, squareMat *b, squareMat *c, squareMat *dummy);
+void mlir_qmat_transformed(squareMat *a, squareMat *b, squareMat *c,
+                           squareMat *dummy);
 void multmat_elt_wise(squareMat *a, squareMat *b, squareMat *c);
 void multmat(squareMat *a, squareMat *b, squareMat *c);
 void multmatTiled(squareMat *a, squareMat *b, squareMat *c);
@@ -55,7 +57,10 @@ int main() {
   FILE *groundTruth = fopen("out/groundTruth", "w");
 
   // perform equivalent of matmul MLIR code on matrices x and y
-  mlir_qmat(&x, &y, &z, &dummy);
+  // mlir_qmat(&x, &y, &z, &dummy);
+
+  // perform transformed C code version of matmul MLIR
+  mlir_qmat_transformed(&x, &y, &z, &dummy);
 
   // print result and ground truth
   printSquareMat(&z, result);
@@ -84,15 +89,13 @@ void mlir_qmat(squareMat *a, squareMat *b, squareMat *c, squareMat *dummy) {
 void multmat(squareMat *a, squareMat *b, squareMat *c) {
   if (!((a->len == b->len) && (b->len == c->len))) {
     return;
-  } // only square matrices allowed
-  uint64_t cells = 0;
+  }                                       // only square matrices allowed
   for (size_t i = 0; i < a->len; i++) {   // for each row
     for (size_t j = 0; j < a->len; j++) { // for each col
       for (size_t k = 0; k < a->len;
            k++) { // sum (each elt in row * each elt in col)
         c->mat[i][j] += a->mat[i][k] * b->mat[k][j];
       }
-      cells++;
     }
   }
 }
@@ -135,7 +138,98 @@ void multmatTiledGeneral(squareMat *a, squareMat *b, squareMat *c,
       }
     }
   }
-} // end of func
+}
+
+/*
+for d0; d0 < 16; d0++:
+for d1; d1 < 16; d1++;
+for d2; d2 < 16; d2++;
+  arg7[d0][d1] += arg3[d0][d2] * arg4[d2][d1]; // and this is a MAC!
+
+TRANSFORMED INTO...
+
+==========================================================================
+Temporal Loops                     O            W            I
+==========================================================================
+for D0 in [0, 4):                  l1           l1           l1
+--------------------------------------------------------------------------
+  for D0 in [0, 4):                l1           l1           l1
+--------------------------------------------------------------------------
+    for D1 in [0, 2):              l1           l1           l1
+--------------------------------------------------------------------------
+      for D1 in [0, 2):            l1           l1           l1
+--------------------------------------------------------------------------
+        for D1 in [0, 4):          l1           l1           l1
+--------------------------------------------------------------------------
+          for D2 in [0, 2):        rf_32b_O     l1           l1
+--------------------------------------------------------------------------
+==========================================================================
+Spatial Loops
+==========================================================================
+            parfor D2 in [0, 8):
+--------------------------------------------------------------------------
+
+
+
+*/
+void mlir_qmat_transformed(squareMat *a, squareMat *b, squareMat *c,
+                           squareMat *dummy) {
+  transposeSquareMat(b, dummy);
+  // only square matrices allowed
+  size_t d0_1_bk_sz = a->len / 4;
+  size_t d1_1_bk_sz = a->len / 2;
+  size_t d1_2_bk_sz = d1_1_bk_sz / 2;
+  size_t d2_1_bk_sz = a->len / 2;
+
+  for (size_t d0_1 = 0; d0_1 < 4; d0_1++) {
+    for (size_t d0_2 = 0; d0_2 < 4; d0_2++) {
+      for (size_t d1_1 = 0; d1_1 < 2; d1_1++) {
+        for (size_t d1_2 = 0; d1_2 < 2; d1_2++) {
+          for (size_t d1_3 = 0; d1_3 < 4; d1_3++) {
+            for (size_t d2_1 = 0; d2_1 < 2; d2_1++) {
+              for (size_t d2_2 = 0; d2_2 < 8;
+                   d2_2++) { // technically spacially unrolled, but won't show
+                             // that here
+                size_t d0 = d0_1 * d0_1_bk_sz + d0_2;
+                size_t d1 = d1_1 * d1_1_bk_sz + d1_2 * d1_2_bk_sz + d1_3;
+                size_t d2 = d2_1 * d2_1_bk_sz + d2_2;
+                c->mat[d0][d1] += a->mat[d0][d2] * b->mat[d2][d1];
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// void mlir_qmat_transformed(squareMat *a, squareMat *b, squareMat *c,
+//                            squareMat *dummy) {
+//   transposeSquareMat(b, dummy);
+//   // only square matrices allowed
+//   for (size_t d0 = 0; d0 < a->len; d0++) {   // for each row
+//     for (size_t d1 = 0; d1 < a->len; d1++) { // for each col
+//       for (size_t d2 = 0; d2 < a->len;
+//            d2++) {
+//         c->mat[d0][d1] += a->mat[d0][d2] * b->mat[d2][d1];
+//       }
+//     }
+//   }
+// }
+
+// void mlir_qmat_transformed(squareMat *a, squareMat *b, squareMat *c,
+//                            squareMat *dummy) {
+//   transposeSquareMat(b, dummy);
+//   // only square matrices allowed
+//   for (size_t i = 0; i < a->len; i++) {   // for each row
+//     for (size_t j = 0; j < a->len; j++) { // for each col
+//       for (size_t k = 0; k < a->len;
+//            k++) { // sum (each elt in row * each elt in col)
+//         c->mat[i][j] += a->mat[i][k] * b->mat[k][j];
+//       }
+//     }
+//   }
+// }
 
 // printing helper function
 void printSquareMat(squareMat *m, FILE *out) {

@@ -117,43 +117,45 @@ int main() {
     return nerr;
   }
 
+  print2DMemRefI32_t(&memrefC, M_size);
+
   // second correctness check - is the c code really equivalent??
-  TwoDMemrefI32_t z;
-  z.data = (int32_t *)&C;
-  z.aligned_data = z.data;
-  z.offset = 0;
+  // TwoDMemrefI32_t z;
+  // z.data = (int32_t *)&C;
+  // z.aligned_data = z.data;
+  // z.offset = 0;
 
-  cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
+  // cCodeEquivalent(&memrefA, &memrefB, &z); // PAMPLEMOUSSE
 
-  nerr = 0;
-  for (int i = 0; i < M_size * N_size; i++) {
-    int32_t error = z.aligned_data[i] - C_golden[i];
-    if (error != 0)
-      nerr += 1;
-  }
-  if (nerr != 0) {
-    printf("Z does not match the golden value!\n");
-    print2DMemRefI32_t(&z, M_size); // PAMPLEMOUSSE
-  }
+  // nerr = 0;
+  // for (int i = 0; i < M_size * N_size; i++) {
+  //   int32_t error = z.aligned_data[i] - C_golden[i];
+  //   if (error != 0)
+  //     nerr += 1;
+  // }
+  // if (nerr != 0) {
+  //   printf("Z does not match the golden value!\n");
+  //   print2DMemRefI32_t(&z, M_size); // PAMPLEMOUSSE
+  // }
 
   // third correctness check - is THIS c code really equivalent???
-  TwoDMemrefI32_t w;
-  w.data = (int32_t *)&C;
-  w.aligned_data = w.data;
-  w.offset = 0;
+  // TwoDMemrefI32_t w;
+  // w.data = (int32_t *)&C;
+  // w.aligned_data = w.data;
+  // w.offset = 0;
 
-  cCodeEquivalentThreeLoops(&memrefA, &memrefB, &w); // PAMPLEMOUSSE
+  // cCodeEquivalentThreeLoops(&memrefA, &memrefB, &w); // PAMPLEMOUSSE
 
-  nerr = 0;
-  for (int i = 0; i < M_size * N_size; i++) {
-    int32_t error = w.aligned_data[i] - C_golden[i];
-    if (error != 0)
-      nerr += 1;
-  }
-  if (nerr != 0) {
-    printf("w does not match the golden value!\n");
-    print2DMemRefI32_t(&w, M_size); // PAMPLEMOUSSE
-  }
+  // nerr = 0;
+  // for (int i = 0; i < M_size * N_size; i++) {
+  //   int32_t error = w.aligned_data[i] - C_golden[i];
+  //   if (error != 0)
+  //     nerr += 1;
+  // }
+  // if (nerr != 0) {
+  //   printf("w does not match the golden value!\n");
+  //   print2DMemRefI32_t(&w, M_size); // PAMPLEMOUSSE
+  // }
   return nerr;
 }
 

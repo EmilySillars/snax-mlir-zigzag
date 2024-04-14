@@ -1,3 +1,9 @@
+matmul.postproc.mlir:49:7: error: failed to legalize operation 'builtin.unrealized_conversion_cast' that was explicitly marked illegal
+      "memref.copy"(%arg1, %24) : (memref<16x16xi8, strided<[1, 16]>>, memref<16x16xi8, strided<[1, 16]>>) -> ()
+      ^
+matmul.postproc.mlir:49:7: note: see current operation: %23 = "builtin.unrealized_conversion_cast"(%22) : (memref<16x16xi8, strided<[1, 16]>>) -> !llvm.struct<(ptr, ptr, i32, array<2 x i32>, array<2 x i32>)>
+
+
 // func.func @simple_matmul(%arg0: memref<16x16xi8>, %arg1: memref<16x16xi8, strided<[1, 16], offset:0>>, %arg2: memref<16x16xi32>) {
 //     %c0_i32 = arith.constant 0 : i32
 //     linalg.quantized_matmul ins(%arg0, %arg1, %c0_i32, %c0_i32 : memref<16x16xi8>, memref<16x16xi8, strided<[1, 16], offset:0>>, i32, i32) outs(%arg2 : memref<16x16xi32>)
