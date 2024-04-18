@@ -1,5 +1,5 @@
 python3 gendata.py
-mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc1.mlir matmul-transformed.mlir
+mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc1.mlir matmul.mlir
 mlir-opt-17 --tosa-to-arith="include-apply-rescale"  --empty-tensor-to-alloc-tensor -o matmul.preproc2.mlir matmul.preproc1.mlir
 mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc3.mlir matmul.preproc2.mlir
 cat matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > matmul.preprocfinal.mlir
