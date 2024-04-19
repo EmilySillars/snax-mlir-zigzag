@@ -197,6 +197,10 @@ void mlir_qmat_transformed(squareMat *a, squareMat *b, squareMat *c,
 }) : () -> ()
 ```
 
+## Running the MLIR
+
+### mlir-cpu-runner
+
 Input matrix A:
 
 ```
@@ -226,7 +230,7 @@ Input matrix B:
 // a 16x16 matrix filled with the value 3, except for elt at (13,13), which is set to 87
 ```
 
-Current output C:
+Current output C with mlir-cpu-runner:
 
 ```
 untiled:
@@ -268,5 +272,40 @@ Unranked Memref base@ = 0xd001cc0 rank = 2 offset = 0 sizes = [16, 16] strides =
  [408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   1584,   408,   408]]
 ```
 
+### using snax
 
+```
+sh run_simple_matmul2.sh 
+```
+
+Error:
+
+```
+...
+  File "/opt/python3.11/lib/python3.11/site-packages/xdsl/parser/attribute_parser.py", line 1298, in _parse_optional_builtin_type
+    return self._parse_optional_builtin_parametrized_type()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/python3.11/lib/python3.11/site-packages/xdsl/parser/attribute_parser.py", line 401, in _parse_optional_builtin_parametrized_type
+    res = builtin_parsers.get(name, unimplemented)()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/python3.11/lib/python3.11/site-packages/xdsl/parser/attribute_parser.py", line 540, in _parse_memref_attrs
+    self.raise_error(
+  File "/opt/python3.11/lib/python3.11/site-packages/xdsl/parser/base_parser.py", line 98, in raise_error
+    raise ParseError(at_position, msg)
+xdsl.utils.exceptions.ParseError: matmul.hoodle.mlir:14:119
+          %8 = memref.alloc() {"alignment" = 64 : i64} : memref<2x16xi8, #tsl.tsl<[?, 8] -> (?, 8), [?, 8] -> (256, 1)>>
+                                                                                                                       ^
+                                                                                                                       Cannot decide if the given attribute is a layout or a memory space!
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/repo/runtime//../compiler/snax-opt", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/repo/compiler/tools/snax_
+```
+
+[Error coming from line in this xdsl file](https://github.com/xdslproject/xdsl/blob/d8ad16bd3c41eda5e0d009ab6b05f9770e2be777/xdsl/parser/attribute_parser.py#L541)
 

@@ -117,7 +117,7 @@ int main() {
     return nerr;
   }
 
-  print2DMemRefI32_t(&memrefC, M_size);
+  //print2DMemRefI32_t(&memrefC, M_size);
 
   // second correctness check - is the c code really equivalent??
   // TwoDMemrefI32_t z;
