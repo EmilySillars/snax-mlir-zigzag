@@ -272,13 +272,13 @@ Unranked Memref base@ = 0xd001cc0 rank = 2 offset = 0 sizes = [16, 16] strides =
  [408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   408,   1584,   408,   408]]
 ```
 
-### using snax
+### running into errors trying to run on snax...
 
 ```
 sh run_simple_matmul2.sh 
 ```
 
-Error:
+1. xDSL parse error
 
 ```
 ...
@@ -307,5 +307,90 @@ Traceback (most recent call last):
   File "/repo/compiler/tools/snax_
 ```
 
-[Error coming from line in this xdsl file](https://github.com/xdslproject/xdsl/blob/d8ad16bd3c41eda5e0d009ab6b05f9770e2be777/xdsl/parser/attribute_parser.py#L541)
+**Solution:** [Joren says](https://xdsl.zulipchat.com/#narrow/stream/368602-Convolve/topic/ZigZag.2FStream.20Integration/near/434308178) to modify the snax-mlir-opt `--set-memory-space` pass to annotate subviews with correct memory space, [which I did here](https://github.com/EmilySillars/snax-mlir-zigzag/blob/d4853d11fe75a1de4d21f562331866e83de59898/compiler/transforms/set_memory_space.py#L115).
 
+2. Even when memory space is annotated, `mlir-opt` does not like the large negative offsets in the `memref.subview`s:
+
+   ```
+   matmul.postproc.mlir:11:304: error: expected a 64-bit signed integer or '?'
+             %5 = "memref.subview"(%arg0) <{"static_offsets" = array<i64: -9223372036854775808, -9223372036854775808>, "static_sizes" = array<i64: 2, 16>, "static_strides" = array<i64: 1, 1>, "operandSegmentSizes" = array<i32: 1, 0, 0, 0>}> : (memref<16x16xi8>) -> memref<2x16xi8, strided<[16, 1], offset: -156797324626531188736>>
+   ```
+
+   **Solution:** change all static offsets to question marks like so
+
+   ```
+             %5 = "memref.subview"(%arg0) <{"static_offsets" = array<i64: ?, ?>, "static_sizes" = array<i64: 2, 16>, "static_strides" = array<i64: 1, 1>, "operandSegmentSizes" = array<i32: 1, 0, 0, 0>}> : (memref<16x16xi8>) -> memref<2x16xi8, strided<[16, 1], offset: -156797324626531188736>>
+   ```
+
+   
+
+3. After changing the static offsets to question marks, `mlir-opt` does not like the question marks:
+
+   ```
+   matmul.postproc.mlir:11:72: error: expected integer literal
+             %5 = "memref.subview"(%arg0) <{"static_offsets" = array<i64: ?, ?>, "static_sizes" = array<i64: 2, 16>, "static_strides" = array<i64: 1, 1>, "operandSegmentSizes" = array<i32: 1, 0, 0, 0>}> : (memref<16x16xi8>) -> memref<2x16xi8, strided<[16, 1], offset: -156797324626531188736>>
+   ```
+
+   **Possible solution:** use some of the compilation flags from the `mlir-cpu-runner` compiler pass to get rid of the `memref.subview` operations before the other lowering pass can complain about their static offsets.
+
+   **New Error:** xdsl parse error on llvm dialect operation
+
+   ```
+   File "/opt/python3.11/lib/python3.11/site-packages/xdsl/parser/base_parser.py", line 98, in raise_error
+       raise ParseError(at_position, msg)
+   xdsl.utils.exceptions.ParseError: matmul.preprocfinal.mlir:15:21
+       %10 = "llvm.icmp"(%9, %1) <{predicate = 2 : i64}> : (i64, i64) -> i1
+                        ^
+                        unregistered operation llvm.icmp!
+   ```
+
+   **Question I have: Should I edit the xDSL parser, or will it balloon into too much work and I should look for another solution to this static_offsets problem?**
+
+## errors
+
+```
+matmul.postproc.mlir:11:72: error: expected integer literal
+          %5 = "memref.subview"(%arg0) <{"static_offsets" = array<i64: ?, ?>, "static_sizes" = array<i64: 2, 16>, "static_strides" = array<i64: 1, 1>, "operandSegmentSizes" = array<i32: 1, 0, 0, 0>}> : (memref<16x16xi8>) -> memref<2x16xi8, strided<[16, 1], offset: ?>>
+                                                                       ^
+```
+
+caused by parser MLIR parser file:
+
+```
+ParseResult DenseArrayElementParser::parseIntegerElement(Parser &p) {
+  bool isNegative = p.consumeIf(Token::minus);
+
+  // Parse an integer literal as an APInt.
+  std::optional<APInt> value;
+  StringRef spelling = p.getToken().getSpelling();
+  if (p.getToken().isAny(Token::kw_true, Token::kw_false)) {
+    if (!type.isInteger(1))
+      return p.emitError("expected i1 type for 'true' or 'false' values");
+    value = APInt(/*numBits=*/8, p.getToken().is(Token::kw_true),
+                  !type.isUnsignedInteger());
+    p.consumeToken();
+  } else if (p.consumeIf(Token::integer)) {
+    value = buildAttributeAPInt(type, isNegative, spelling);
+    if (!value)
+      return p.emitError("integer constant out of range");
+  } else {
+    return p.emitError("expected integer literal");
+  }
+  append(*value);
+  return success();
+}
+```
+
+- But if i had a dynamic subview, I wouldn't have to parse dense arrays, right? because i wouldn't have a static offset field??
+
+If i get rid of the static_offsets field, I get the following error:
+
+```
+matmul.postproc.mlir:11:16: error: invalid properties {operandSegmentSizes = array<i32: 1, 0, 0, 0>, static_sizes = array<i64: 2, 16>, static_strides = array<i64: 1, 1>} for op memref.subview: expected key entry for static_offsets in DictionaryAttr to set Properties.
+          %5 = "memref.subview"(%arg0) <{ "static_sizes" = array<i64: 2, 16>, "static_strides" = array<i64: 1, 1>, "operandSegmentSizes" = array<i32: 1, 0, 0, 0>}> : (memref<16x16xi8>) -> memref<2x16xi8, strided<[16, 1], offset: ?>>
+               ^
+```
+
+possible file throwing the error: `/home/hoppip/llvm-project-pistachio/mlir/tools/mlir-tblgen/OpDefinitionsGen.cpp`
+
+- but static offsets are first introduced by an xDSL pass, RIGHT???? If i never put them in, will i get MLIR errors?
