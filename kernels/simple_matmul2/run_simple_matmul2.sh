@@ -1,21 +1,37 @@
-# python3 gendata.py
-# mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc1.mlir matmul-transformed.mlir
-# mlir-opt-17 --tosa-to-arith="include-apply-rescale"  --empty-tensor-to-alloc-tensor -o matmul.preproc2.mlir matmul.preproc1.mlir
-# mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc3.mlir matmul.preproc2.mlir
-# cat matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > matmul.preprocfinal.mlir
+python3 gendata.py
+mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc1.mlir matmul-transformed.mlir
+mlir-opt-17 --tosa-to-arith="include-apply-rescale"  --empty-tensor-to-alloc-tensor -o matmul.preproc2.mlir matmul.preproc1.mlir
 
-# ## separating memory attotated IR from non-memory annotated IR
-# /repo/runtime//../compiler/snax-opt -p dispatch-kernels,set-memory-space -o matmul.afterMemAnns.mlir matmul.preprocfinal.mlir
-# /repo/runtime//../compiler/snax-opt -p set-memory-layout,realize-memref-casts -o matmul.afterMemAnns2.mlir matmul.afterMemAnns.mlir
-# /repo/runtime//../compiler/snax-opt -p insert-sync-barrier,dispatch-regions,linalg-to-library-call,snax-copy-to-dma,memref-to-snax,snax-to-func,clear-memory-space -o matmul.snax-opt.mlir matmul.afterMemAnns2.mlir
+
+mlir-opt-17 -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf matmul.preproc1.mlir > out/crazy1.mlir
+
+mlir-opt-17 -convert-vector-to-llvm --convert-cf-to-llvm out/crazy1.mlir > out/crazy2.mlir
+
+mlir-opt-17 -expand-strided-metadata -lower-affine -convert-arith-to-llvm \
+--memref-expand -finalize-memref-to-llvm out/crazy2.mlir > out/crazy3.mlir
+
+# between preproc2 and preproc3
+mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops \
+--empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
+function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc3.mlir out/crazy3.mlir #matmul.preproc2.mlir
+cat matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > matmul.preprocfinal.mlir
+
+## separating memory attotated IR from non-memory annotated IR
+/repo/runtime//../compiler/snax-opt -p dispatch-kernels,set-memory-space -o matmul.afterMemAnns.mlir matmul.preprocfinal.mlir
+/repo/runtime//../compiler/snax-opt -p set-memory-layout,realize-memref-casts -o matmul.afterMemAnns2.mlir matmul.afterMemAnns.mlir
+/repo/runtime//../compiler/snax-opt -p insert-sync-barrier,dispatch-regions,linalg-to-library-call,snax-copy-to-dma,memref-to-snax,snax-to-func,clear-memory-space -o matmul.snax-opt.mlir matmul.afterMemAnns2.mlir
 
 
 
 # cat matmul.snax-opt.mlir | sed 's/arith.maximumf/arith.maxf/g' | sed 's/arith.minimumf/arith.minf/g' > matmul.postproc.mlir
-mlir-opt-17  --convert-linalg-to-loops --convert-scf-to-cf --lower-affine --canonicalize --cse --convert-math-to-llvm --llvm-request-c-wrappers --expand-strided-metadata --convert-index-to-llvm=index-bitwidth=32 --convert-cf-to-llvm=index-bitwidth=32 --convert-arith-to-llvm=index-bitwidth=32 --convert-func-to-llvm='index-bitwidth=32' --finalize-memref-to-llvm='use-generic-functions index-bitwidth=32' --canonicalize --reconcile-unrealized-casts -o matmul.ll.mlir matmul.postproc.mlir
-mlir-opt-17  --convert-linalg-to-loops -o matmul.ll.mlir matmul.postproc.mlir
-mlir-opt-17  --convert-scf-to-cf -o matmul.ll.mlir matmul.postproc.mlir
-#-o matmul.ll.mlir matmul.postproc.mlir
+
+
+
+
+# mlir-opt-17  --convert-linalg-to-loops --convert-scf-to-cf --lower-affine --canonicalize --cse --convert-math-to-llvm --llvm-request-c-wrappers --expand-strided-metadata --convert-index-to-llvm=index-bitwidth=32 --convert-cf-to-llvm=index-bitwidth=32 --convert-arith-to-llvm=index-bitwidth=32 --convert-func-to-llvm='index-bitwidth=32' --finalize-memref-to-llvm='use-generic-functions index-bitwidth=32' --canonicalize --reconcile-unrealized-casts -o matmul.ll.mlir matmul.postproc.mlir
+# mlir-opt-17  --convert-linalg-to-loops -o matmul.ll.mlir matmul.postproc.mlir
+# mlir-opt-17  --convert-scf-to-cf -o matmul.ll.mlir matmul.postproc.mlir
+# -o matmul.ll.mlir matmul.postproc.mlir
 
 
 
