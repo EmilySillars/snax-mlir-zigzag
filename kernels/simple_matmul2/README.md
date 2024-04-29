@@ -346,6 +346,39 @@ Traceback (most recent call last):
 
    **Question I have: Should I edit the xDSL parser, or will it balloon into too much work and I should look for another solution to this static_offsets problem?**
 
+4. [After changing the compilation script to use more intermediate steps](https://github.com/EmilySillars/snax-mlir-zigzag/blob/zigzag-to-snax/kernels/simple_matmul2/run_simple_matmul2.sh#L23-L48), the invalid static_offsets are no longer generated. BUT I get a new error:
+
+   ```
+     File "/opt/python3.11/lib/python3.11/site-packages/xdsl/tools/command_line_tool.py", line 688, in parse_chunk
+       raise Exception("Failed to parse:\n" + e.with_context()) from e
+   Exception: Failed to parse:
+   out/matmul.preprocfinal.mlir:11:36
+             %subview = memref.subview %arg0[%arg5, %arg4] [2, 16] [1, 1] : memref<16x16xi8> to memref<2x16xi8, strided<[16, 1], offset: ?>>
+                                       ^^^^^
+                                       Operation memref.subview does not have a custom format.
+   ```
+
+   Solution???
+
+   - I need to edit [this file](https://github.com/xdslproject/xdsl/blob/main/xdsl/dialects/memref.py#L531) to add dynamic subviews to the xDSL parser!
+   - OR I need to add the [ShapedType::kDynamic](https://mlir.llvm.org/docs/Dialects/MemRef/#memrefsubview-memrefsubviewop) attribute to the memref's or memref.subview's meref type? Relevant discourse question [here](https://discourse.llvm.org/t/how-can-i-create-memory-alloc-by-memref-alloc-for-dynamic-dimensions-using-c/69318).
+   - OR I need to modify the xDSL parser to it can take in subviews with affine_maps??
+
+   Q: Also, which pass was it that was causing the insertion of invalid static_offsets?
+
+   A: This one, but then executing more passes one by one gets rid of these invalid static offsets :O
+
+   ```
+   mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' \
+   --mlir-print-op-generic --mlir-print-local-scope -o out/matmul.preproc1.mlir matmul-transformed.mlir
+   ```
+
+   **Solution:** 
+
+   1) Add support for subviews w/o static offsets to xDSL's parser, and to snax-opt's `--set-memory-space` pass.
+   2) Running `sh run_simple_matmul_on_doctored.sh` compiles the tiled matmul, but then execution on SNAX hangs. Maybe this is because the GEMM accerator cannot handle more than a simple matmul, and the tiling is inside the matmul function?
+   3) Implement tiling logic for host in C, the in MLIR, and run with tiled MLIR code trimmed down to just the kernel getting fed to accelerator.
+
 ## errors
 
 ```
@@ -394,3 +427,13 @@ matmul.postproc.mlir:11:16: error: invalid properties {operandSegmentSizes = arr
 possible file throwing the error: `/home/hoppip/llvm-project-pistachio/mlir/tools/mlir-tblgen/OpDefinitionsGen.cpp`
 
 - but static offsets are first introduced by an xDSL pass, RIGHT???? If i never put them in, will i get MLIR errors?
+
+/home/hoppip/snax-mlir-zigzag/
+
+../../kernels/simple_matmul2/out/matmul.preprocfinal.mlir
+
+```
+python3 snax_opt_main.py ../../kernels/simple_matmul2/out/matmul.preprocfinal.mlir
+
+```
+
