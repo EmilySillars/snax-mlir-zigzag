@@ -37,7 +37,7 @@ class InitFuncMemorySpace(RewritePattern):
                         t.element_type,
                         t.get_shape(),
                         t.layout,
-                        builtin.IntegerAttr(1989, builtin.i32), # CHANGE THIS BACK TO ZERO BEFORE FINILIZING EDITS!!!! PINEAPPLE
+                        builtin.IntegerAttr(0, builtin.i32),
                     )
             return t
 

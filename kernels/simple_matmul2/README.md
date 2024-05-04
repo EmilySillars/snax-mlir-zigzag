@@ -275,7 +275,25 @@ Unranked Memref base@ = 0xd001cc0 rank = 2 offset = 0 sizes = [16, 16] strides =
 ### running into errors trying to run on snax...
 
 ```
-sh run_simple_matmul2.sh 
+sh run_simple_matmul.sh matmul-transformed.mlir
+```
+
+Execution Hangs :(
+
+
+
+
+
+
+
+
+
+
+
+sed -i 's/-9223372036854775808/0/g'
+
+```
+sed -i 's/old-word/new-word/g' *.txt
 ```
 
 1. xDSL parse error

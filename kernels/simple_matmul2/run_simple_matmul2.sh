@@ -1,56 +1,56 @@
-# python3 gendata.py
+python3 gendata.py
 
-# mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' \
-# --mlir-print-op-generic --mlir-print-local-scope -o out/matmul.preproc1.mlir matmul-transformed.mlir
+mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' \
+--mlir-print-op-generic --mlir-print-local-scope -o out/matmul.preproc1.mlir matmul-transformed.mlir
 
-# mlir-opt-17 --tosa-to-arith="include-apply-rescale" --empty-tensor-to-alloc-tensor -o out/matmul.preproc2.0.mlir out/matmul.preproc1.mlir
+mlir-opt-17 --tosa-to-arith="include-apply-rescale" --empty-tensor-to-alloc-tensor -o out/matmul.preproc2.0.mlir out/matmul.preproc1.mlir
 
-# # crazy interlude vvv
-# # mlir-opt-17 -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf out/matmul.preproc1.mlir > out/crazy1.mlir
+# crazy interlude vvv
+# mlir-opt-17 -convert-linalg-to-loops -convert-vector-to-scf -convert-scf-to-cf out/matmul.preproc1.mlir > out/crazy1.mlir
 
-# # mlir-opt-17 -convert-vector-to-llvm --convert-cf-to-llvm out/crazy1.mlir > out/crazy2.mlir
+# mlir-opt-17 -convert-vector-to-llvm --convert-cf-to-llvm out/crazy1.mlir > out/crazy2.mlir
 
-# # mlir-opt-17 -expand-strided-metadata -lower-affine -convert-arith-to-llvm \
-# # --memref-expand -finalize-memref-to-llvm out/crazy2.mlir > out/crazy3.mlir
-# # crazy interlude ^^^
+# mlir-opt-17 -expand-strided-metadata -lower-affine -convert-arith-to-llvm \
+# --memref-expand -finalize-memref-to-llvm out/crazy2.mlir > out/crazy3.mlir
+# crazy interlude ^^^
 
-# # continue processing crazy3.mlir
-# # mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops \
-# # --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
-# # function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc3.mlir out/crazy3.mlir 
-# # cat matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > matmul.preprocfinal.mlir
+# continue processing crazy3.mlir
+# mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops \
+# --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
+# function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope -o matmul.preproc3.mlir out/crazy3.mlir 
+# cat matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > matmul.preprocfinal.mlir
 
-# # preproc2 to preproc3 with intermediate steps vvv
-# mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" \
-# -o out/matmul.preproc2.1.mlir out/matmul.preproc2.0.mlir
+# preproc2 to preproc3 with intermediate steps vvv
+mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" \
+-o out/matmul.preproc2.1.mlir out/matmul.preproc2.0.mlir
 
-# mlir-opt-17 --linalg-generalize-named-ops \
-# -o out/matmul.preproc2.2.mlir out/matmul.preproc2.1.mlir
+mlir-opt-17 --linalg-generalize-named-ops \
+-o out/matmul.preproc2.2.mlir out/matmul.preproc2.1.mlir
 
-# mlir-opt-17 --empty-tensor-to-alloc-tensor \
-# -o out/matmul.preproc2.3.mlir out/matmul.preproc2.2.mlir
+mlir-opt-17 --empty-tensor-to-alloc-tensor \
+-o out/matmul.preproc2.3.mlir out/matmul.preproc2.2.mlir
 
-# mlir-opt-17 --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
-# function-boundary-type-conversion=identity-layout-map" \
-# -o out/matmul.preproc2.4.mlir out/matmul.preproc2.3.mlir
+mlir-opt-17 --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
+function-boundary-type-conversion=identity-layout-map" \
+-o out/matmul.preproc2.4.mlir out/matmul.preproc2.3.mlir
 
-# mlir-opt-17 --mlir-print-op-generic \
-# -o out/matmul.preproc2.5.mlir out/matmul.preproc2.4.mlir
+mlir-opt-17 --mlir-print-op-generic \
+-o out/matmul.preproc2.5.mlir out/matmul.preproc2.4.mlir
 
-# mlir-opt-17 --mlir-print-local-scope \
-# -o out/matmul.preproc3.mlir out/matmul.preproc2.5.mlir
-# # preproc2 to preproc3 with intermediate steps ^^^
+mlir-opt-17 --mlir-print-local-scope \
+-o out/matmul.preproc3.mlir out/matmul.preproc2.5.mlir
+# preproc2 to preproc3 with intermediate steps ^^^
 
-# # between preproc2 and preproc3
-# # mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops \
-# # --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
-# # function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope \
-# # -o out/matmul.preproc3.mlir out/matmul.preproc2.0.mlir
+# between preproc2 and preproc3
+# mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops \
+# --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs \
+# function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope \
+# -o out/matmul.preproc3.mlir out/matmul.preproc2.0.mlir
 
-# cat out/matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > out/matmul.preprocfinal.mlir
+cat out/matmul.preproc3.mlir | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > out/matmul.preprocfinal.mlir
 
-# mlir-opt-17 --mlir-print-op-generic \
-# -o out/matmul.preprocfinal.generic.mlir out/matmul.preprocfinal.mlir
+mlir-opt-17 --mlir-print-op-generic \
+-o out/matmul.preprocfinal.generic.mlir out/matmul.preprocfinal.mlir
 
 # # separating memory attotated IR from non-memory annotated IR
 # /repo/runtime//../compiler/snax-opt -p dispatch-kernels,set-memory-space -o out/matmul.afterMemAnns.mlir out/matmul.preprocfinal.generic.mlir
