@@ -43,22 +43,12 @@ uint32_t strideC = 0;
 // Kernel provided via external definition
 void _mlir_ciface_simple_matmul(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
                                 TwoDMemrefI32_t *c);
-void _mlir_ciface_tiled_matmul(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
-                               TwoDMemrefI32_t *c);
-void _mlir_ciface_tester(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
+                                
+void _mlir_ciface_tile_compute(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
                                 TwoDMemrefI32_t *c);
-void pineapple(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
-                                TwoDMemrefI32_t *c);
-// void _mlir_ciface_hoodle(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
-//                                 TwoDMemrefI32_t *c);
 
-void hoodle(TwoDMemrefI8_t *x){
-  printf("hoodle\n");
-}
-
-void _mlir_ciface_mlirFunc(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, TwoDMemrefI32_t *c);
-//void _mlir_ciface_cFunc(TwoDMemrefI8_t *a);
-
+void _mlir_ciface_mlirFunc(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
+                           TwoDMemrefI32_t *c);
 
 void _mlir_ciface_snax_qgemm(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, int32_t zpa,
                              int32_t zpb, TwoDMemrefI32_t *c) {
@@ -79,11 +69,23 @@ void _mlir_ciface_snax_qgemm(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, int32_t zpa,
   wait_batch_gemm();
 }
 
+int trouble = 0;
+
 void cCodeEquivalentThreeLoops(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y,
                                TwoDMemrefI32_t *z);
 void cCodeEquivalent(TwoDMemrefI8_t *x, TwoDMemrefI8_t *y, TwoDMemrefI32_t *z);
 void print2DMemRefI8_t(TwoDMemrefI8_t *x, int32_t width);
 void print2DMemRefI32_t(TwoDMemrefI32_t *x, int32_t width);
+void print2DMemRefI32_t_notASquare(TwoDMemrefI32_t *x, int32_t stride_x, int32_t stride_y);
+void hoodle(TwoDMemrefI8_t *x) { printf("hoodle\n"); }
+void _mlir_ciface_dispatch_to_accelerator(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, TwoDMemrefI32_t *c){
+  printf("hello %d\n",trouble);
+  trouble++;
+  (void)snrt_mcycle();
+  _mlir_ciface_tile_compute(a, b, c);
+  snrt_cluster_hw_barrier();
+  (void)snrt_mcycle();
+}
 
 // ADDING EVEN SMALLER MATRICES TO TEST!
 const int8_t little_A[256] = {
@@ -133,28 +135,12 @@ const int32_t little_golden[256] = {
     408, 408, 408, 408, 408, 408, 408, 408, 408, 408, 408, 408, 408, 408, 408,
     408};
 
-// LET'S TRY TO SPLICE IN THE SCF TILE LOGIC FOR LOOPS!
-// void for_each_tile(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, TwoDMemrefI32_t *c) {
-
-
+// void tile_compute(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, TwoDMemrefI32_t *c) {
+//   (void)snrt_mcycle();
+//   _mlir_ciface_simple_matmul(a, b, c);
+//   snrt_cluster_hw_barrier();
+//   (void)snrt_mcycle();
 // }
-
-void process_tile(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, TwoDMemrefI32_t *c) {
-  (void)snrt_mcycle();
-  _mlir_ciface_simple_matmul(a, b, c);
-  snrt_cluster_hw_barrier();
-  (void)snrt_mcycle();
-}
-
-void process_matrix(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, TwoDMemrefI32_t *c) {
-  (void)snrt_mcycle();
-
-  _mlir_ciface_simple_matmul(a, b, c);
-
-  snrt_cluster_hw_barrier();
-
-  (void)snrt_mcycle();
-}
 
 int main() {
 
@@ -183,17 +169,7 @@ int main() {
   // I want that MLIR function to call a C function
   // -------------------------------------------------- ^
 
-  // print2DMemRefI8_t(&memrefA, M_size); // PAMPLEMOUSSE
-  // print2DMemRefI8_t(&memrefB, M_size); // PAMPLEMOUSSE
-  // print2DMemRefI32_t(&memrefC, M_size); // PAMPLEMOUSSE
-
-  //process_matrix(&memrefA, &memrefB, &memrefC);
-  // _mlir_ciface_simple_matmul(&memrefA, &memrefB, &memrefC);
-  //(void)snrt_mcycle();
-  process_matrix(&memrefA, &memrefB, &memrefC);
-  // snrt_cluster_hw_barrier();
-  // (void)snrt_mcycle();
-  // pineapple(&memrefA, &memrefB, &memrefC);
+ // tile_compute(&memrefA, &memrefB, &memrefC);
 
   printf("PAMPLEMOUSSE VOLCANO: Performed MLIR kernel.\n");
 
@@ -215,8 +191,7 @@ int main() {
   if (nerr != 0) {
     printf("Output does not match the golden value!\n");
     return nerr;
-  }
-  else{
+  } else {
     printf("correct!\n");
   }
 
@@ -286,6 +261,22 @@ void print2DMemRefI32_t(TwoDMemrefI32_t *x, int32_t width) {
   int32_t col = 0;
   for (int i = 0; i < width * width; i++) {
     if (col == width) {
+      col = 0;
+      printf("\n %d ", x->aligned_data[i]);
+
+    } else {
+      printf(" %d ", x->aligned_data[i]);
+    }
+    col++;
+  }
+  printf("]\n");
+}
+
+void print2DMemRefI32_t_notASquare(TwoDMemrefI32_t *x, int32_t stride_x, int32_t stride_y) {
+  printf("[\n");
+  int32_t col = 0;
+  for (int i = 0; i < stride_x*stride_y; i++) {
+    if (col == stride_x) {
       col = 0;
       printf("\n %d ", x->aligned_data[i]);
 

@@ -15,9 +15,16 @@ class InitFuncMemorySpace(RewritePattern):
         """Add a default (0 : i32) memory space to memrefs used in the function
         that do not have a memory space specified yet"""
 
+       # print(f'\nDRAGON SLAYER {str(op.sym_name)}\n') # EMILY
+        
+
         # Function must be public
         if op.sym_visibility is not None and op.sym_visibility.data != "public":
             return
+
+       # print(f'\t{str(op.sym_name)} is a public function\n') # EMILY
+
+      #  print(f'\t{str(op)}\n') # EMILY
 
         # Function must have memref arguments with an undefined memory space
         if not any(
@@ -28,6 +35,8 @@ class InitFuncMemorySpace(RewritePattern):
             ]
         ):
             return
+        
+      #  print(f'\t{str(op.sym_name)} has at least one undefined memory space\n') # EMILY
         
         # Mapping function to assign default memory space (0 : i32)
         def change_to_memory_space(t):
@@ -40,7 +49,7 @@ class InitFuncMemorySpace(RewritePattern):
                         builtin.IntegerAttr(0, builtin.i32),
                     )
             return t
-
+     #   print(f'\t creating a new version of {str(op.sym_name)}...\n') # EMILY
         # Define new function type with updated inputs and outputs
         # mapped to a default memory space
         new_function_type = builtin.FunctionType.from_lists(
