@@ -21,6 +21,7 @@
  * /target/snitch_cluster/sw/snax/mac/include"
  *
  * */
+// https://github.com/KULeuven-MICAS/snax_cluster/blob/e0c51a37b0e9048f3667d720bb982d3bfc98b3c0/target/snitch_cluster/sw/snax/gemm/include/snax-gemm-lib.h#L43
 #include "snax-gemm-lib.h"
 #include "snax-gemm-params.h"
 
@@ -30,18 +31,21 @@ uint8_t M_param = M_size / meshRow;
 uint8_t K_param = K_size / tileSize;
 uint8_t N_param = N_size / meshCol;
 // Extracted from datagen.py in snitch_cluster repo
-uint32_t strideInnermostA = 256;
-uint32_t strideInnermostB = 256;
-uint32_t strideInnermostC = 256;
-uint32_t ldA = 512;
+uint32_t strideInnermostA = 256; // incremental address of each submatrix of A; (each submatrix has size 256)
+uint32_t strideInnermostB = 256; // incremental address of each submatrix of B; (each submatrix has size 256)
+uint32_t strideInnermostC = 256; // incremental address of each submatrix of C; (each submatrix has size 256)
+uint32_t ldA = 512; // incremental address of each block row of A; (add 512 to get to the next row of A???)
 uint32_t ldB = 512;
 uint32_t ldC = 512;
-uint32_t strideA = 0;
-uint32_t strideB = 0;
-uint32_t strideC = 0;
+uint32_t strideA = 0; // incremental address of A for each batch, but and only 1 batch, so set to 0
+uint32_t strideB = 0; // incremental address of B for each batch, but and only 1 batch, so set to 0
+uint32_t strideC = 0; // incremental address of C for each batch, but and only 1 batch, so set to 0
+
+// https://github.com/KULeuven-MICAS/snax-gemm?tab=readme-ov-file#batch-stride-gemm
+// https://github.com/KULeuven-MICAS/snax_cluster/blob/e0c51a37b0e9048f3667d720bb982d3bfc98b3c0/target/snitch_cluster/sw/snax/gemm/src/snax-gemm-lib.c
 
 // Kernel provided via external definition
-void _mlir_ciface_simple_matmul(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
+void _mlir_ciface_matmul_16x16(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b,
                                 TwoDMemrefI32_t *c);
 
 void _mlir_ciface_snax_gemm(TwoDMemrefI8_t *a, TwoDMemrefI8_t *b, int32_t zpa,
@@ -85,7 +89,7 @@ int main() {
 
   (void)snrt_mcycle();
 
-  _mlir_ciface_simple_matmul(&memrefA, &memrefB, &memrefC);
+  _mlir_ciface_matmul_16x16(&memrefA, &memrefB, &memrefC);
 
   snrt_cluster_hw_barrier();
 

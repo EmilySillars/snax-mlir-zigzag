@@ -1,5 +1,12 @@
 # SNAX-MLIR-ZigZag Forked Repo
 Run and Test ZigZag-Tiled MLIR examples with Verilator Simulating SNAX + gemm.
+
+## Examples
+
+| Test + Description                                           | Matrix Size | Allocation | Values | Tiling Method                                                | Verilator |
+| :----------------------------------------------------------- | ----------- | ---------- | ------ | ------------------------------------------------------------ | --------- |
+| **Matmul 16x16**<br />Dispatches work to gemm accelerator, which has an 8x8x8 MAC array<br />Full details [here](../kernels/matmul_16x16/matmul_16x16.md) | 16x16       | static     | fixed  | ZigZag w/ [SNAX+gemm](https://github.com/EmilySillars/zigzag/blob/manual-examples/zigzag/inputs/hardware/gemm.yaml) | TODO      |
+
 ### *quick setup*
 
 
@@ -63,5 +70,14 @@ where `<docker version>` is `v0.1.6` from `image: ghcr.io/kuleuven-micas/snax:v0
    sudo chmod 666 /var/run/docker.sock
    ```
 
-2. error 2
+2. ```
+   ld.lld-17: error: undefined symbol: memset
+   >>> referenced by main.c
+   >>>               main.o:(main)
+   ```
 
+   Solution: Use `-fno-builtin-memset` or `-fno-builtin`, so edited Makefile.rules's CLAGS macro to include `CFLAGS += -fno-builtin-memset`, and LDFLAGS to include `LDFLAGS += -fno-builtin-memset`!
+
+3. 
+
+4. another error?

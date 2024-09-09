@@ -6,8 +6,8 @@ include ../../runtime/snax-gemm.rules
 include ../../runtime/Makefile.rules
 
 TESTS =
-TESTS += matmul.x
-TESTS += matmul.acc_dialect.x
+TESTS += matmul104x104_zigzag.x
+TESTS += matmul104x104_zigzag.acc_dialect.x
 
 CFLAGS += -std=gnu11
 CFLAGS += -Wall -Wextra

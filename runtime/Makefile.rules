@@ -43,6 +43,7 @@ CFLAGS += -mcmodel=medany
 CFLAGS += -ftls-model=local-exec
 CFLAGS += -ffast-math
 CFLAGS += -fno-builtin-printf
+CFLAGS += -fno-builtin-memset
 CFLAGS += -fno-common
 CFLAGS += -O3
 
@@ -57,6 +58,7 @@ LDFLAGS += -L$(SNITCH_SW_PATH)/target/snitch_cluster/sw/runtime/rtl-generic
 LDFLAGS += -L$(SNITCH_SW_PATH)/target/snitch_cluster/sw/runtime/rtl-generic/build
 LDFLAGS += -nostdlib
 LDFLAGS += -lsnRuntime
+LDFLAGS += -fno-builtin-memset
 
 # useful for debugging at llvm level:
 %.ll: %.c
