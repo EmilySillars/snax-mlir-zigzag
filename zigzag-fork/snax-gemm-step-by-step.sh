@@ -15,7 +15,7 @@ ls "$IN/$1.mlir"
 
 
 mlir-opt-17 --pass-pipeline='builtin.module(func.func(tosa-to-linalg-named, tosa-to-tensor, tosa-to-scf, tosa-to-linalg))' --mlir-print-op-generic --mlir-print-local-scope -o "$OUT/$1.preproc1.mlir" "$IN/$1.mlir"
-mlir-opt-17 --tosa-to-arith="include-apply-rescale"  --empty-tensor-to-alloc-tensor -o "$OUT/$1.preproc2.mlir" "$OUT/$1.preproc1.mlir"
+mlir-opt-17 --tosa-to-arith="include-apply-rescale" --empty-tensor-to-alloc-tensor -o "$OUT/$1.preproc2.mlir" "$OUT/$1.preproc1.mlir"
 mlir-opt-17 --test-linalg-transform-patterns="test-generalize-pad-tensor" --linalg-generalize-named-ops --empty-tensor-to-alloc-tensor --one-shot-bufferize="bufferize-function-boundaries allow-return-allocs function-boundary-type-conversion=identity-layout-map" --mlir-print-op-generic --mlir-print-local-scope -o "$OUT/$1.preproc3.mlir" "$OUT/$1.preproc2.mlir"
 cat "$OUT/$1.preproc3.mlir" | sed 's/arith.maxf/arith.maximumf/g' | sed 's/arith.minf/arith.minimumf/g' > "$OUT/$1.preprocfinal.mlir"
 /repo/runtime//../compiler/snax-opt -p dispatch-kernels,set-memory-space,set-memory-layout,realize-memref-casts,reuse-memref-allocs,insert-sync-barrier,dispatch-regions,linalg-to-library-call,snax-copy-to-dma,memref-to-snax,snax-to-func,clear-memory-space -o "$OUT/$1.snax-opt.mlir" "$OUT/$1.preprocfinal.mlir"

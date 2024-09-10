@@ -102,11 +102,104 @@ Recall: `O[a][b]+=I[a][c]*W[c][b]`
 
 Plans for next steps:
 
-1. Write out the C-pseudocode for this zigzag tiling scheme
+1. Write out the C-ish pseudocode for this zigzag tiling scheme
 
-2. Write out the C-pseudocode for this zigzag tilingscheme when spatial loops are left for the accelerator to handle
+```
+copyFromL3toL1(weight[0][0], shape[16][16])
+copyFromL3toL1(input[0][0], shape[16][16])
+copyFromL3toL1(output[0][0], shape[16][16])
 
-3. Try to write the execution of this tiling scheme using base_gemm, source code here: https://github.com/KULeuven-MICAS/snax_cluster/blob/e0c51a37b0e9048f3667d720bb982d3bfc98b3c0/target/snitch_cluster/sw/snax/gemm/src/snax-gemm-lib.c#L26
+a0_bk_sz = 8;
+b0_bk_sz = 8;
+c0_bk_sz = 8;
+
+for (a0 = 0; a0 < 2; a0++){
+for (b0 = 0; b0 < 2; b0++){
+for (c0 = 0; c0 < 2; c0++){
+// following inner loops should execute in parallel
+for (a1 = 0; a1 < 8; a1++){
+for (b1 = 0; b1 < 8; b1++){
+for (c1 = 0; c1 < 8; c1++){
+a = a0*a0_bk_sz + a1;
+b = b0*b0_bk_sz + b1;
+c = c0*c0_bk_sz + c1;
+output[a][b] = input[a][c]*weight[c][b]
+}
+}
+}		
+}
+}
+}
+```
+
+1. Write out the C-pseudocode for this zigzag tilingscheme when spatial loops are left for the accelerator to handle
+
+```
+copyFromL3toL1(weight[0][0], shape[16][16])
+copyFromL3toL1(input[0][0], shape[16][16])
+copyFromL3toL1(output[0][0], shape[16][16])
+
+a0_bk_sz = 8;
+b0_bk_sz = 8;
+c0_bk_sz = 8;
+
+for (a0 = 0; a0 < 2; a0++){
+for (b0 = 0; b0 < 2; b0++){
+for (c0 = 0; c0 < 2; c0++){
+// copyFromL3toL1(weight[c2*c2_bk_sz][0], shape[c2_bk_sz][104])
+// %slice_W_L3 = memref.subview %weight[%slice_W_L3_offset, %zero][26,104][1,1]
+weight_submatrix = memref.subview %weight_L1[0,0]
+// following inner loops should execute in parallel
+for (a1 = 0; a1 < 8; a1++){
+for (b1 = 0; b1 < 8; b1++){
+for (c1 = 0; c1 < 8; c1++){
+a = a0*a0_bk_sz + a1;
+b = b0*b0_bk_sz + b1;
+c = c0*c0_bk_sz + c1;
+O[a][b] = I[a][c]*W[c][b]
+}
+}
+}		
+}
+}
+}
+```
+
+
+
+1. Try to write the execution of this tiling scheme using base_gemm, source code here: https://github.com/KULeuven-MICAS/snax_cluster/blob/e0c51a37b0e9048f3667d720bb982d3bfc98b3c0/target/snitch_cluster/sw/snax/gemm/src/snax-gemm-lib.c#L26
+
+   ```
+   void base_gemm(uint8_t m, uint8_t k, uint8_t n, int8_t* A, int8_t* B,
+                  int8_t subtraction_a, int8_t subtraction_b, int32_t* C_cpu,
+                  bool clear) {
+       for (int i = 0; i < m; i++) {
+           for (int j = 0; j < n; j++) {
+               // clear memory first before start matrix multiplication
+               // to accumulate in K dimension
+               if (clear == true) {
+                   C_cpu[i * n + j] = 0;
+               }
+               for (int s = 0; s < k; s++) {
+                   C_cpu[i * n + j] =
+                       C_cpu[i * n + j] +
+                       ((int32_t)A[i * k + s] - (int32_t)subtraction_a) *
+                           ((int32_t)B[s + j * k] - (int32_t)subtraction_b);
+               }
+           }
+       }
+   };
+   ```
+
+   - Look at ZigZag-generated diagram, then try drawing my own diagram of gemm accelerator if it doesn't make sense
+
+   - Ask Arne about gemm hardware description - can he confirm my diagram is accurate?
+
+   - Can I draw tiling diagram after hardware description?
+
+   - Can I verify that output needs to be in weird order to be correct when using gemm accelerator?
+
+   - How do I know that the output is register is used how ZigZag recommends??
 
 
 4. a. take notes on base_gemm
